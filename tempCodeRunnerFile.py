@@ -1,0 +1,1 @@
+ "Installa con 'pip install alpaca-py pandas'"
