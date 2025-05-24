@@ -1,12 +1,18 @@
 python-dateutil
 matplotlib
 requests
-edgar
-numpy
-alpaca_data_loader
+#edgar
+#alpaca_data_loader
 pickle
 fastapi>=0.68.0
 uvicorn>=0.15.0
 pandas>=1.3.0
 plotly>=5.3.0
 python-multipart>=0.0.5
+fastapi>=0.68.0
+uvicorn>=0.15.0
+pandas>=1.3.0
+plotly>=5.3.0
+python-multipart>=0.0.5
+numpy<2.0.0  # Questa versione è compatibile con Python 3.10
+# alpaca_data_loader  # Rimuovi o commenta questa riga se non è essenziale
