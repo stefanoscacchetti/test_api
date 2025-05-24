@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Response, File, UploadFile, status, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Tuple, Dict, Any
 import pickle
 import pandas as pd
 import plotly.express as px
@@ -11,6 +11,28 @@ from plotly.io import to_image
 import base64
 import subprocess
 from pathlib import Path
+from typing import List, Dict, Any
+
+def _get_performance_color(performance: float) -> str:
+    """Convert performance percentage to a color between red and green.
+    
+    Args:
+        performance: Performance as a decimal (e.g., 0.1 for 10%)
+        
+    Returns:
+        str: Hex color code
+    """
+    # Ensure performance is between -1 and 1
+    performance = max(-1, min(1, performance))
+    
+    if performance >= 0:
+        # Green gradient (lighter to darker)
+        intensity = int(200 + (55 * (1 - performance)))
+        return f'#00{intensity:02x}00'
+    else:
+        # Red gradient (darker to lighter)
+        intensity = int(200 + (55 * (1 - abs(performance))))
+        return f'#{intensity:02x}0000'
 
 app = FastAPI()
 
@@ -213,10 +235,11 @@ def get_multiple_ciks(
     raise HTTPException(status_code=400, detail="Must provide either 'names' or 'first' parameter")
 
 # Get treemap visualization for a specific CIK and trimester
-@app.get("/cik/{cik}/treemap/{trimester}", response_class=HTMLResponse)
+@app.get("/cik/{cik}/treemap/{trimester}")
 async def get_treemap_visualization(cik: str, trimester: str):
     """
-    Generate and return a treemap visualization for a specific CIK and trimester.
+    Generate and return treemap data for a specific CIK and trimester.
+    Returns a JSON object optimized for Flutter applications.
     The treemap shows portfolio allocation colored by stock performance.
     """
     # Load the database
@@ -260,24 +283,37 @@ async def get_treemap_visualization(cik: str, trimester: str):
         data = pd.DataFrame({
             'tickers': valid_tickers,
             'pct_alloc': valid_allocations,
-            'color': performance_last_trimester
+            'performance': performance_last_trimester,
+            'hover_text': [
+                f"Ticker: {ticker}<br>"
+                f"Allocation: {alloc:.2f}%<br>"
+                f"Performance: {perf:.2%}"
+                for ticker, alloc, perf in zip(valid_tickers, valid_allocations, performance_last_trimester)
+            ]
         })
         
-        # Generate the plot
-        fig = px.treemap(
-            data,
-            path=['tickers'],
-            values='pct_alloc',
-            color='color',
-            color_continuous_scale=["red", "green"],
-            title=f"Stock Performance Treemap - CIK: {cik}, Trimester: {trimester}"
-        )
+        # Prepare Flutter-friendly response
+        response_data = {
+            'title': f'Portfolio Allocation - {trimester}',
+            'data': [],
+            'total_allocation': sum(valid_allocations),
+            'total_performance': sum(p * a for p, a in zip(performance_last_trimester, valid_allocations)) / sum(valid_allocations) if valid_allocations else 0
+        }
         
-        # Convert plot to image bytes
-        img_bytes = to_image(fig, format='png')
+        # Add each stock's data
+        for i, (ticker, alloc, perf) in enumerate(zip(valid_tickers, valid_allocations, performance_last_trimester)):
+            response_data['data'].append({
+                'id': i,
+                'ticker': ticker,
+                'allocation': float(alloc),
+                'performance': float(perf),
+                'color': _get_performance_color(perf)
+            })
         
-        # Return the image
-        return Response(content=img_bytes, media_type="image/png")
+        # Sort by allocation (descending)
+        response_data['data'].sort(key=lambda x: x['allocation'], reverse=True)
+        
+        return JSONResponse(content=response_data)
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating treemap: {str(e)}")
