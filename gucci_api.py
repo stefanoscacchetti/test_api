@@ -349,29 +349,42 @@ async def get_portfolio_performance(cik: str):
         performance_data = portfolio_data['overall_performances']
         
         # Convert the performance data to a format suitable for FlutterFlow
-        # The exact format depends on your data structure, but here's an example:
         performance_points = []
         
-        # Example: If performance_data is a pandas Series with dates as index
+        def format_date(date):
+            """Convert date to ISO 8601 format string"""
+            if isinstance(date, (datetime, pd.Timestamp)):
+                return date.isoformat() + 'Z'  # 'Z' indicates UTC
+            try:
+                # Try to parse the date if it's a string
+                date_obj = pd.to_datetime(date)
+                return date_obj.isoformat() + 'Z'
+            except:
+                # Fallback to string representation if parsing fails
+                return str(date)
+        
+        # Handle pandas Series/DataFrame
         if hasattr(performance_data, 'index') and hasattr(performance_data, 'values'):
             for date, value in zip(performance_data.index, performance_data.values):
                 performance_points.append({
-                    'date': str(date),  # Convert date to string
-                    'value': float(value)  # Ensure value is serializable
+                    'x': format_date(date),
+                    'y': float(value) if pd.notnull(value) else 0.0
                 })
-        # If it's a dictionary with date: value pairs
+        # Handle dictionary
         elif isinstance(performance_data, dict):
             for date, value in performance_data.items():
                 performance_points.append({
-                    'date': str(date),
-                    'value': float(value)
+                    'x': format_date(date),
+                    'y': float(value) if value is not None else 0.0
                 })
         else:
-            # Handle other data formats as needed
             raise HTTPException(
                 status_code=500,
                 detail="Unexpected performance data format"
             )
+            
+        # Sort by date to ensure chronological order
+        performance_points.sort(key=lambda x: x['x'])
         
         # Get S&P 500 performance if available
         sp500_points = []
