@@ -346,7 +346,7 @@ async def get_portfolio_performance(cik: str):
             )
             
         # Get the performance data
-        performance_data = portfolio_data['overall_performances']
+        performance_data = portfolio_data['overall_performances'] - 1
         
         # Convert the performance data to a format suitable for FlutterFlow
         performance_points = []
