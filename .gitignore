@@ -9,13 +9,6 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Database
-*.pickle
-*.pkl
-database.pickle
-database.pkl
-
 # Environment variables
 .env
 .venv
