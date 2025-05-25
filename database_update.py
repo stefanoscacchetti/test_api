@@ -1,6 +1,6 @@
 from load_data import load_data
 import time
-import yfinance as yf
+#import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -76,7 +76,7 @@ def data_prep_for_db_update(
         
         # Pausa tra le richieste
         if idx > 0:  # Non serve aspettare prima della prima richiesta
-            wait_time = 30  # 30 secondi tra una richiesta e l'altra
+            wait_time = 60  # 60 secondi tra una richiesta e l'altra
             print(f"Attesa di {wait_time} secondi per rispettare i limiti di frequenza...")
             time.sleep(wait_time)
         try:
@@ -245,10 +245,18 @@ def data_prep_for_db_update(
         # Crea il vettore dei pesi a partire dalle allocazioni
         weights_series = pd.Series(ticker_allocations)
         # Normalizza i pesi per assicurarsi che la somma sia 1
-        weights_series = weights_series / weights_series.sum()
+        #weights_series = weights_series / weights_series.sum()
+        weights_series = weights_series
         
         # Allinea i pesi con le colonne di returns
         w = weights_series.reindex(returns.columns).fillna(0)
+
+        #print debug per vedere se i pesi vengono assegnati bene
+        print('#############################\n\n\n')
+        print()
+        print(w)
+        print(returns)
+        print('#############################\n\n\n')
         
         # Calcola il rendimento del portafoglio
         port_ret = returns.mul(w, axis=1).sum(axis=1)
@@ -262,9 +270,13 @@ def data_prep_for_db_update(
         all_returns.append(port_ret)
 
     #here we save the performance of the portfolio for all the period day by day
+    #print(all_returns.head())
+    #print(all_returns.tail())
+    #print returns in the middle
+    #print(all_returns.iloc[all_returns.shape[0]//2-8:all_returns.shape[0]//2])
     chained = pd.concat(all_returns[::-1])
     chained = chained[~chained.index.duplicated(keep='first')]
-    overall_cum = (1 + chained).cumprod()
+    overall_cum = (chained).cumsum()
     '''
     sp500_data = yf.download(
             '^GSPC',
@@ -330,7 +342,7 @@ def database_update(filings_count : int= 10, identity : str = 'mario rossi mario
                 print(f"{'='*80}\n")
                 
                 # Processa il CIK
-                database = data_prep_for_db_update(database, cik, filings_count=10, identity=identity, top_n=20)
+                database = data_prep_for_db_update(database, cik, filings_count=filings_count, identity=identity, top_n=20)
                 
                 # Stampa riepilogo dopo ogni CIK
                 # Salva il database dopo ogni CIK
@@ -361,4 +373,4 @@ def database_update(filings_count : int= 10, identity : str = 'mario rossi mario
     print("Database aggiornato con successo!")
 
 if __name__ == '__main__':
-    database_update(filings_count=10)
+    database_update(filings_count=2)

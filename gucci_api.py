@@ -317,3 +317,93 @@ async def get_treemap_visualization(cik: str, trimester: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating treemap: {str(e)}")
+
+
+
+#endpoint to return the graph data to the forntend
+@app.get("/cik/{cik}/performance")
+async def get_portfolio_performance(cik: str):
+    """
+    Get portfolio performance data for a specific CIK.
+    Returns performance data in a format suitable for FlutterFlow graph widget.
+    """
+    try:
+        # Load the database
+        db = load_database()
+        
+        # Validate CIK exists in database
+        if cik not in db:
+            raise HTTPException(status_code=404, detail="CIK not found in database")
+            
+        # Get the portfolio data for the CIK
+        portfolio_data = db[cik]
+        
+        # Check if we have performance data
+        if 'overall_performances' not in portfolio_data:
+            raise HTTPException(
+                status_code=404,
+                detail="No performance data available for this CIK"
+            )
+            
+        # Get the performance data
+        performance_data = portfolio_data['overall_performances']
+        
+        # Convert the performance data to a format suitable for FlutterFlow
+        # The exact format depends on your data structure, but here's an example:
+        performance_points = []
+        
+        # Example: If performance_data is a pandas Series with dates as index
+        if hasattr(performance_data, 'index') and hasattr(performance_data, 'values'):
+            for date, value in zip(performance_data.index, performance_data.values):
+                performance_points.append({
+                    'date': str(date),  # Convert date to string
+                    'value': float(value)  # Ensure value is serializable
+                })
+        # If it's a dictionary with date: value pairs
+        elif isinstance(performance_data, dict):
+            for date, value in performance_data.items():
+                performance_points.append({
+                    'date': str(date),
+                    'value': float(value)
+                })
+        else:
+            # Handle other data formats as needed
+            raise HTTPException(
+                status_code=500,
+                detail="Unexpected performance data format"
+            )
+        
+        # Get S&P 500 performance if available
+        sp500_points = []
+        if 'sp500_performances' in portfolio_data:
+            sp500_data = portfolio_data['sp500_performances']
+            if hasattr(sp500_data, 'index') and hasattr(sp500_data, 'values'):
+                for date, value in zip(sp500_data.index, sp500_data.values):
+                    sp500_points.append({
+                        'date': str(date),
+                        'value': float(value)
+                    })
+            elif isinstance(sp500_data, dict):
+                for date, value in sp500_data.items():
+                    sp500_points.append({
+                        'date': str(date),
+                        'value': float(value)
+                    })
+        
+        # Return the data in a format suitable for FlutterFlow
+        return {
+            'portfolio': {
+                'name': 'Portfolio',
+                'data': performance_points
+            },
+            'sp500': {
+                'name': 'S&P 500',
+                'data': sp500_points
+            } if sp500_points else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving performance data: {str(e)}"
+        )
